@@ -82,11 +82,21 @@ export async function PATCH(request: Request) {
   // Verify user owns the section
   const { data: section } = await supabase
     .from('sections')
-    .select('profile_id, profiles!inner(user_id)')
+    .select('profile_id')
     .eq('id', id)
     .single()
 
-  if (!section || section.profiles.user_id !== user.id) {
+  if (!section) {
+    return NextResponse.json({ error: 'Section not found' }, { status: 404 })
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('user_id')
+    .eq('id', section.profile_id)
+    .single()
+
+  if (!profile || profile.user_id !== user.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 
@@ -128,11 +138,21 @@ export async function DELETE(request: Request) {
   // Verify user owns the section
   const { data: section } = await supabase
     .from('sections')
-    .select('profile_id, profiles!inner(user_id)')
+    .select('profile_id')
     .eq('id', id)
     .single()
 
-  if (!section || section.profiles.user_id !== user.id) {
+  if (!section) {
+    return NextResponse.json({ error: 'Section not found' }, { status: 404 })
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('user_id')
+    .eq('id', section.profile_id)
+    .single()
+
+  if (!profile || profile.user_id !== user.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 
