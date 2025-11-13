@@ -33,17 +33,19 @@ export default function DashboardPage() {
       .from('profiles')
       .select('*')
       .eq('user_id', user.id)
-      .single()
+      .single<Profile>()
 
     if (profileData) {
       setProfile(profileData)
       setDisplayName(profileData.display_name || '')
       setBio(profileData.bio || '')
 
+      const profileId: string = profileData.id
+
       const { data: sectionsData } = await supabase
         .from('sections')
         .select('*')
-        .eq('profile_id', profileData.id)
+        .eq('profile_id', profileId)
         .order('position')
 
       if (sectionsData) {
@@ -62,13 +64,16 @@ export default function DashboardPage() {
   const updateProfile = async () => {
     if (!profile) return
 
+    const updateData = {
+      display_name: displayName,
+      bio: bio,
+      updated_at: new Date().toISOString(),
+    }
+
     const { error } = await supabase
       .from('profiles')
-      .update({
-        display_name: displayName,
-        bio: bio,
-        updated_at: new Date().toISOString(),
-      })
+      // @ts-expect-error - Supabase type inference issue
+      .update(updateData)
       .eq('id', profile.id)
 
     if (!error) {
@@ -86,15 +91,18 @@ export default function DashboardPage() {
       gallery: { images: [] },
     }
 
+    const insertData = {
+      profile_id: profile.id,
+      title: `New ${type.replace('_', ' ')}`,
+      type,
+      content: defaultContent[type],
+      position: sections.length,
+    }
+
     const { error } = await supabase
       .from('sections')
-      .insert({
-        profile_id: profile.id,
-        title: `New ${type.replace('_', ' ')}`,
-        type,
-        content: defaultContent[type],
-        position: sections.length,
-      })
+      // @ts-expect-error - Supabase type inference issue
+      .insert(insertData)
 
     if (!error) {
       loadProfile()

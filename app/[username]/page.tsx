@@ -16,14 +16,19 @@ async function getProfile(username: string) {
     .from('profiles')
     .select('*')
     .eq('username', username.toLowerCase())
-    .single()
+    .single<Profile>()
 
-  if (!profile) return null
+  if (!profile) {
+    return null
+  }
+
+  // TypeScript now knows profile is Profile (not null)
+  const profileId: string = profile.id
 
   const { data: sections } = await supabase
     .from('sections')
     .select('*')
-    .eq('profile_id', profile.id)
+    .eq('profile_id', profileId)
     .eq('visible', true)
     .order('position')
 

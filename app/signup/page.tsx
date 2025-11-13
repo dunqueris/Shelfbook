@@ -76,21 +76,25 @@ export default function SignupPage() {
 
     // Create profile directly using RPC function (bypasses RLS)
     // First, let's try using the database function if it exists
-    const { data: profileData, error: rpcError } = await supabase.rpc('create_profile_for_user', {
+    const rpcParams = {
       p_user_id: authData.user.id,
       p_username: username.toLowerCase(),
       p_display_name: username,
-    })
+    }
+    // @ts-expect-error - Supabase type inference issue
+    const { data: profileData, error: rpcError } = await supabase.rpc('create_profile_for_user', rpcParams)
 
     if (rpcError) {
       // If RPC function doesn't exist, try direct insert (should work with session)
+      const insertData = {
+        user_id: authData.user.id,
+        username: username.toLowerCase(),
+        display_name: username,
+      }
       const { error: profileError } = await supabase
         .from('profiles')
-        .insert({
-          user_id: authData.user.id,
-          username: username.toLowerCase(),
-          display_name: username,
-        })
+        // @ts-expect-error - Supabase type inference issue
+        .insert(insertData)
 
       if (profileError) {
         // If direct insert also fails, try API route as fallback
