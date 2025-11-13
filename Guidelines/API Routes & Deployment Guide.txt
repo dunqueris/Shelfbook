@@ -1,0 +1,241 @@
+# Profile Platform MVP - Complete Code & Setup
+
+## 📁 Project Structure
+
+```
+profile-platform/
+├── app/
+│   ├── layout.tsx
+│   ├── page.tsx
+│   ├── login/
+│   │   └── page.tsx
+│   ├── signup/
+│   │   └── page.tsx
+│   ├── dashboard/
+│   │   └── page.tsx
+│   ├── [username]/
+│   │   └── page.tsx
+│   └── api/
+│       ├── profile/
+│       │   └── route.ts
+│       └── sections/
+│           └── route.ts
+├── components/
+│   ├── Navbar.tsx
+│   ├── ProfileCard.tsx
+│   ├── SectionNav.tsx
+│   ├── sections/
+│   │   ├── TextListSection.tsx
+│   │   ├── LinksSection.tsx
+│   │   └── GallerySection.tsx
+│   └── editor/
+│       ├── ProfileEditor.tsx
+│       └── SectionEditor.tsx
+├── lib/
+│   ├── supabase.ts
+│   └── types.ts
+├── package.json
+├── next.config.js
+├── tailwind.config.js
+└── tsconfig.json
+```
+
+## 🚀 Step 1: Initialize Project
+
+```bash
+npx create-next-app@latest profile-platform --typescript --tailwind --app
+cd profile-platform
+npm install @supabase/supabase-js @supabase/auth-helpers-nextjs lucide-react
+```
+
+## 🗄️ Step 2: Supabase Setup
+
+1. Go to https://supabase.com and create a free account
+2. Create a new project
+3. Go to SQL Editor and run this:
+
+```sql
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Profiles table
+CREATE TABLE profiles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  username TEXT UNIQUE NOT NULL,
+  display_name TEXT,
+  bio TEXT,
+  avatar_url TEXT,
+  banner_url TEXT,
+  theme TEXT DEFAULT 'default',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Sections table
+CREATE TABLE sections (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  profile_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  type TEXT NOT NULL, -- 'text_list', 'links', 'gallery'
+  content JSONB NOT NULL,
+  position INTEGER NOT NULL,
+  visible BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX idx_profiles_username ON profiles(username);
+CREATE INDEX idx_sections_profile ON sections(profile_id);
+
+-- Row Level Security
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sections ENABLE ROW LEVEL SECURITY;
+
+-- Policies for profiles
+CREATE POLICY "Public profiles are viewable by everyone"
+  ON profiles FOR SELECT
+  USING (true);
+
+CREATE POLICY "Users can update own profile"
+  ON profiles FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own profile"
+  ON profiles FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+-- Policies for sections
+CREATE POLICY "Public sections are viewable by everyone"
+  ON sections FOR SELECT
+  USING (visible = true);
+
+CREATE POLICY "Users can manage own sections"
+  ON sections FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = sections.profile_id
+      AND profiles.user_id = auth.uid()
+    )
+  );
+```
+
+3. Go to Settings > API and copy your:
+   - Project URL
+   - `anon` public key
+
+4. Create `.env.local` in your project root:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+```
+
+## 📝 Step 3: Core Files
+
+### `lib/supabase.ts`
+```typescript
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@supabase/supabase-js'
+
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+export const getSupabaseClient = () => createClientComponentClient()
+```
+
+### `lib/types.ts`
+```typescript
+export interface Profile {
+  id: string
+  user_id: string
+  username: string
+  display_name: string | null
+  bio: string | null
+  avatar_url: string | null
+  banner_url: string | null
+  theme: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Section {
+  id: string
+  profile_id: string
+  title: string
+  type: 'text_list' | 'links' | 'gallery'
+  content: any
+  position: number
+  visible: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface TextListContent {
+  items: string[]
+}
+
+export interface LinksContent {
+  links: Array
+}
+
+export interface GalleryContent {
+  images: Array
+}
+```
+
+### `package.json` (add these scripts)
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  }
+}
+```
+
+### `next.config.js`
+```javascript
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    domains: ['your-supabase-project.supabase.co'],
+  },
+}
+
+module.exports = nextConfig
+```
+
+### `tailwind.config.js`
+```javascript
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+```
+
+## 🎯 Next Steps
+
+I'll provide the complete component code in separate artifacts:
+
+1. **Authentication pages** (login/signup)
+2. **Dashboard & Profile Editor**
+3. **Public Profile Display**
+4. **Section Components**
+5. **API Routes**
+
+Ready for the component code?

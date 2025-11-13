@@ -1,0 +1,297 @@
+// app/[username]/page.tsx
+import { supabase } from '@/lib/supabase'
+import { Profile, Section } from '@/lib/types'
+import ProfileCard from '@/components/ProfileCard'
+import { notFound } from 'next/navigation'
+
+interface PageProps {
+  params: {
+    username: string
+  }
+}
+
+async function getProfile(username: string) {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('username', username.toLowerCase())
+    .single()
+
+  if (!profile) return null
+
+  const { data: sections } = await supabase
+    .from('sections')
+    .select('*')
+    .eq('profile_id', profile.id)
+    .eq('visible', true)
+    .order('position')
+
+  return { profile, sections: sections || [] }
+}
+
+export default async function PublicProfilePage({ params }: PageProps) {
+  const data = await getProfile(params.username)
+
+  if (!data) {
+    notFound()
+  }
+
+  return <ProfileCard profile={data.profile} sections={data.sections} />
+}
+
+// components/ProfileCard.tsx
+'use client'
+
+import { useState } from 'react'
+import { Profile, Section } from '@/lib/types'
+import TextListSection from './sections/TextListSection'
+import LinksSection from './sections/LinksSection'
+import GallerySection from './sections/GallerySection'
+
+interface Props {
+  profile: Profile
+  sections: Section[]
+}
+
+export default function ProfileCard({ profile, sections }: Props) {
+  const [activeSection, setActiveSection] = useState<string>('profile')
+
+  const renderSection = (section: Section) => {
+    switch (section.type) {
+      case 'text_list':
+        return <TextListSection section={section} />
+      case 'links':
+        return <LinksSection section={section} />
+      case 'gallery':
+        return <GallerySection section={section} />
+      default:
+        return null
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Banner */}
+        <div className="bg-gradient-to-r from-purple-500 to-blue-500 h-32 rounded-t-2xl" />
+
+        {/* Profile Container */}
+        <div className="bg-white rounded-b-2xl shadow-xl overflow-hidden">
+          {/* Profile Header */}
+          <div className="px-8 pb-6 -mt-16">
+            <div className="flex items-end gap-6 mb-6">
+              <div className="w-32 h-32 bg-white rounded-full border-4 border-white shadow-lg flex items-center justify-center text-5xl">
+                {profile.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={profile.display_name || profile.username}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <span>👤</span>
+                )}
+              </div>
+              <div className="flex-1 mb-2">
+                <h1 className="text-3xl font-bold">{profile.display_name}</h1>
+                <p className="text-gray-600">@{profile.username}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Horizontal Navigation */}
+          <div className="border-b overflow-x-auto">
+            <div className="flex px-8 gap-1">
+              <button
+                onClick={() => setActiveSection('profile')}
+                className={`px-6 py-3 font-semibold transition whitespace-nowrap ${
+                  activeSection === 'profile'
+                    ? 'text-purple-600 border-b-2 border-purple-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Profile
+              </button>
+              {sections.map((section) => (
+                <button
+                  key={section.id}
+                  onClick={() => setActiveSection(section.id)}
+                  className={`px-6 py-3 font-semibold transition whitespace-nowrap ${
+                    activeSection === section.id
+                      ? 'text-purple-600 border-b-2 border-purple-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {section.title}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Content Area */}
+          <div className="p-8 min-h-[400px]">
+            {activeSection === 'profile' ? (
+              <div className="max-w-2xl">
+                <h2 className="text-2xl font-bold mb-4">About</h2>
+                {profile.bio ? (
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {profile.bio}
+                  </p>
+                ) : (
+                  <p className="text-gray-400 italic">No bio yet</p>
+                )}
+              </div>
+            ) : (
+              <>
+                {sections
+                  .filter((s) => s.id === activeSection)
+                  .map((section) => (
+                    <div key={section.id}>{renderSection(section)}</div>
+                  ))}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center py-8 text-gray-600">
+          <p className="text-sm">
+            Built with{' '}
+            <span className="text-purple-600 font-semibold">ProfileHub</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// components/sections/TextListSection.tsx
+import { Section, TextListContent } from '@/lib/types'
+
+interface Props {
+  section: Section
+}
+
+export default function TextListSection({ section }: Props) {
+  const content = section.content as TextListContent
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-6">{section.title}</h2>
+      <ul className="space-y-3">
+        {content.items.map((item, index) => (
+          <li
+            key={index}
+            className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+          >
+            <span className="text-purple-600 font-bold mt-1">•</span>
+            <span className="flex-1">{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// components/sections/LinksSection.tsx
+import { Section, LinksContent } from '@/lib/types'
+import { ExternalLink } from 'lucide-react'
+
+interface Props {
+  section: Section
+}
+
+export default function LinksSection({ section }: Props) {
+  const content = section.content as LinksContent
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-6">{section.title}</h2>
+      <div className="space-y-3">
+        {content.links.map((link, index) => (
+          <a
+            key={index}
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block p-5 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border-2 border-transparent hover:border-purple-300 transition group"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <h3 className="font-bold text-lg group-hover:text-purple-600 transition">
+                  {link.title}
+                </h3>
+                {link.description && (
+                  <p className="text-gray-600 text-sm mt-1">{link.description}</p>
+                )}
+              </div>
+              <ExternalLink
+                size={20}
+                className="text-gray-400 group-hover:text-purple-600 transition"
+              />
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// components/sections/GallerySection.tsx
+import { Section, GalleryContent } from '@/lib/types'
+
+interface Props {
+  section: Section
+}
+
+export default function GallerySection({ section }: Props) {
+  const content = section.content as GalleryContent
+
+  if (content.images.length === 0) {
+    return (
+      <div>
+        <h2 className="text-2xl font-bold mb-6">{section.title}</h2>
+        <div className="text-center py-12 text-gray-400">
+          <p>No images yet</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-6">{section.title}</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {content.images.map((image, index) => (
+          <div
+            key={index}
+            className="aspect-square rounded-xl overflow-hidden group cursor-pointer"
+          >
+            <img
+              src={image.url}
+              alt={image.caption || `Image ${index + 1}`}
+              className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// app/not-found.tsx
+export default function NotFound() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50">
+      <div className="text-center">
+        <h1 className="text-6xl font-bold text-gray-800 mb-4">404</h1>
+        <p className="text-xl text-gray-600 mb-8">Profile not found</p>
+        <a
+          href="/"
+          className="px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition"
+        >
+          Go Home
+        </a>
+      </div>
+    </div>
+  )
+}

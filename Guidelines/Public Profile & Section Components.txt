@@ -1,0 +1,365 @@
+// app/api/profile/route.ts
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
+
+export async function GET() {
+  const supabase = createRouteHandlerClient({ cookies })
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('user_id', user.id)
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json(profile)
+}
+
+export async function PATCH(request: Request) {
+  const supabase = createRouteHandlerClient({ cookies })
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await request.json()
+  const { display_name, bio, avatar_url, banner_url, theme } = body
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .update({
+      display_name,
+      bio,
+      avatar_url,
+      banner_url,
+      theme,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('user_id', user.id)
+    .select()
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json(profile)
+}
+
+// app/api/sections/route.ts
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
+
+export async function GET(request: Request) {
+  const supabase = createRouteHandlerClient({ cookies })
+  const { searchParams } = new URL(request.url)
+  const profileId = searchParams.get('profile_id')
+
+  if (!profileId) {
+    return NextResponse.json({ error: 'Profile ID required' }, { status: 400 })
+  }
+
+  const { data: sections, error } = await supabase
+    .from('sections')
+    .select('*')
+    .eq('profile_id', profileId)
+    .order('position')
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json(sections)
+}
+
+export async function POST(request: Request) {
+  const supabase = createRouteHandlerClient({ cookies })
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await request.json()
+  const { profile_id, title, type, content, position } = body
+
+  // Verify user owns the profile
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('user_id')
+    .eq('id', profile_id)
+    .single()
+
+  if (!profile || profile.user_id !== user.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
+
+  const { data: section, error } = await supabase
+    .from('sections')
+    .insert({
+      profile_id,
+      title,
+      type,
+      content,
+      position,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json(section)
+}
+
+export async function PATCH(request: Request) {
+  const supabase = createRouteHandlerClient({ cookies })
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await request.json()
+  const { id, title, content, visible } = body
+
+  // Verify user owns the section
+  const { data: section } = await supabase
+    .from('sections')
+    .select('profile_id, profiles!inner(user_id)')
+    .eq('id', id)
+    .single()
+
+  if (!section || section.profiles.user_id !== user.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
+
+  const { data: updatedSection, error } = await supabase
+    .from('sections')
+    .update({
+      title,
+      content,
+      visible,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json(updatedSection)
+}
+
+export async function DELETE(request: Request) {
+  const supabase = createRouteHandlerClient({ cookies })
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { searchParams } = new URL(request.url)
+  const id = searchParams.get('id')
+
+  if (!id) {
+    return NextResponse.json({ error: 'Section ID required' }, { status: 400 })
+  }
+
+  // Verify user owns the section
+  const { data: section } = await supabase
+    .from('sections')
+    .select('profile_id, profiles!inner(user_id)')
+    .eq('id', id)
+    .single()
+
+  if (!section || section.profiles.user_id !== user.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
+
+  const { error } = await supabase
+    .from('sections')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true })
+}
+
+// DEPLOYMENT GUIDE
+/*
+═══════════════════════════════════════════════════════════
+🚀 COMPLETE DEPLOYMENT GUIDE
+═══════════════════════════════════════════════════════════
+
+STEP 1: LOCAL SETUP
+───────────────────
+
+1. Create project:
+   npx create-next-app@latest profile-platform --typescript --tailwind --app
+   cd profile-platform
+
+2. Install dependencies:
+   npm install @supabase/supabase-js @supabase/auth-helpers-nextjs lucide-react
+
+3. Copy all code files from the artifacts to your project
+
+4. Create .env.local with your Supabase credentials
+
+
+STEP 2: SUPABASE SETUP
+──────────────────────
+
+1. Go to https://supabase.com
+2. Create account (it's free)
+3. Create new project
+4. Wait 2-3 minutes for database to spin up
+5. Go to SQL Editor → Run the SQL from the setup guide
+6. Go to Settings → API → Copy your URL and anon key
+7. Add to .env.local
+
+
+STEP 3: TEST LOCALLY
+────────────────────
+
+1. Run dev server:
+   npm run dev
+
+2. Open http://localhost:3000
+
+3. Test flow:
+   - Sign up with email/password
+   - Create profile
+   - Add sections
+   - View public profile at /yourusername
+
+
+STEP 4: DEPLOY TO VERCEL (FREE)
+───────────────────────────────
+
+1. Push code to GitHub:
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git branch -M main
+   git remote add origin YOUR_GITHUB_REPO_URL
+   git push -u origin main
+
+2. Go to https://vercel.com
+3. Sign up with GitHub
+4. Click "New Project"
+5. Import your GitHub repo
+6. Add environment variables:
+   - NEXT_PUBLIC_SUPABASE_URL
+   - NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+7. Click Deploy
+
+8. Your app will be live at: your-project.vercel.app
+
+
+STEP 5: CUSTOM DOMAIN (OPTIONAL)
+────────────────────────────────
+
+In Vercel dashboard:
+1. Go to Project Settings → Domains
+2. Add your custom domain
+3. Follow DNS setup instructions
+
+
+═══════════════════════════════════════════════════════════
+✅ WHAT YOU'VE BUILT
+═══════════════════════════════════════════════════════════
+
+MVP Features:
+✓ User authentication (email/password)
+✓ Profile creation with username
+✓ Bio and display name
+✓ 3 section types (text lists, links, galleries)
+✓ Horizontal navigation between sections
+✓ Public profile pages (/username)
+✓ Dashboard for editing
+✓ Responsive design
+✓ Clean, modern UI
+
+
+Next Steps (Post-MVP):
+□ Image uploads for avatars/galleries
+□ Section editing UI
+□ Drag-and-drop reordering
+□ Theme customization
+□ Premium features (custom domains, analytics)
+□ Social features (likes, follows)
+
+
+═══════════════════════════════════════════════════════════
+🐛 COMMON ISSUES & FIXES
+═══════════════════════════════════════════════════════════
+
+Issue: "Invalid API credentials"
+Fix: Double-check .env.local has correct Supabase keys
+
+Issue: "Username already taken"
+Fix: Database constraint working correctly - choose different username
+
+Issue: Build errors about auth-helpers
+Fix: npm install @supabase/auth-helpers-nextjs@latest
+
+Issue: Sections not showing
+Fix: Check RLS policies are set up correctly in Supabase
+
+Issue: Can't access /username pages
+Fix: Clear Next.js cache: rm -rf .next && npm run dev
+
+
+═══════════════════════════════════════════════════════════
+📚 HELPFUL RESOURCES
+═══════════════════════════════════════════════════════════
+
+Next.js Docs: https://nextjs.org/docs
+Supabase Docs: https://supabase.com/docs
+Tailwind CSS: https://tailwindcss.com/docs
+Vercel Deploy: https://vercel.com/docs
+
+
+═══════════════════════════════════════════════════════════
+💡 TIPS
+═══════════════════════════════════════════════════════════
+
+1. Start simple - get MVP working before adding features
+2. Test each feature as you build it
+3. Use Supabase dashboard to debug database issues
+4. Check browser console for errors
+5. Deploy early, deploy often
+6. Get real users ASAP to validate idea
+
+
+YOU CAN DO THIS! 🎉
+
+The hardest part is starting. Everything else is just
+following steps and fixing bugs as they come up.
+
+Good luck building! 🚀
+*/
