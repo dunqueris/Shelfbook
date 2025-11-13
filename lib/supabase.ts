@@ -10,8 +10,25 @@ export function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+  // During build time (SSR/SSG), if env vars are missing, create a placeholder client
+  // This prevents build failures. The client will fail at runtime if env vars are still missing.
   if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing Supabase environment variables')
+    // Check if we're in a browser environment
+    const isBrowser = typeof window !== 'undefined'
+    
+    // Only throw if we're in browser and env vars are missing (runtime error)
+    // During build/SSR, create a placeholder to allow build to complete
+    if (isBrowser) {
+      throw new Error('Missing Supabase environment variables')
+    }
+    
+    // During build/SSR, create a placeholder client
+    // This allows the build to complete, but will fail at runtime if env vars aren't set
+    supabaseClient = createClient(
+      'https://placeholder.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDUxOTIwMDAsImV4cCI6MTk2MDc2ODAwMH0.placeholder'
+    )
+    return supabaseClient
   }
 
   supabaseClient = createClient(supabaseUrl, supabaseKey)

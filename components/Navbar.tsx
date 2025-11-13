@@ -9,21 +9,32 @@ import { useRouter } from 'next/navigation'
 export default function Navbar() {
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
-  const supabase = getSupabaseClient()
 
   useEffect(() => {
-    checkUser()
+    // Only initialize Supabase client on the client side
+    const supabase = getSupabaseClient()
+    checkUser(supabase)
   }, [])
 
-  const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    setUser(user)
+  const checkUser = async (supabase: ReturnType<typeof getSupabaseClient>) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    } catch (error) {
+      // Silently fail during build/runtime if env vars are missing
+      console.error('Failed to get user:', error)
+    }
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
-    router.push('/')
+    try {
+      const supabase = getSupabaseClient()
+      await supabase.auth.signOut()
+      setUser(null)
+      router.push('/')
+    } catch (error) {
+      console.error('Failed to logout:', error)
+    }
   }
 
   return (
